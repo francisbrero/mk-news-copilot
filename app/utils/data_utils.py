@@ -92,6 +92,7 @@ def write_json_file(file_path: Path, data: Dict[str, List[Any]]) -> None:
         with open(file_path, 'w') as f:
             json.dump(data, f, indent=2, default=json_serialize)
 
+
 def append_item(file_path: Path, item: Dict[str, Any]) -> None:
     """Thread-safe append item to JSON file."""
     with file_locks[file_path]:
