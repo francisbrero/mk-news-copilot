@@ -45,6 +45,8 @@ OPENAI_API_KEY=your_api_key_here
 5. Initialize the data directory:
 ```bash
 mkdir -p data
+touch data/news.json
+echo "[]" > data/news.json
 ```
 
 ## Project Structure
@@ -57,12 +59,15 @@ mk-news-copilot/
 │   └── subscriptions.json  # User subscriptions
 ├── app/
 │   ├── models/             # Pydantic models
-│   ├── utils/              # Utility functions
-│   └── ai/                 # AI processing modules
-├── scripts/                # Data ingestion scripts
-├── tests/                  # Test files
-├── .env                    # Environment variables
-└── requirements.txt        # Project dependencies
+│   ├── utils/             # Utility functions
+│   ├── ai/                # AI processing modules
+│   │   └── ai_processor.py # GPT-based article processing
+│   └── main.py           # FastAPI application
+├── scripts/
+│   └── ingest.py         # News ingestion script
+├── tests/                 # Test files
+├── .env                   # Environment variables
+└── requirements.txt       # Project dependencies
 ```
 
 ## Usage
@@ -72,10 +77,16 @@ mk-news-copilot/
 uvicorn app.main:app --reload
 ```
 
-2. Run the news ingestion script:
+2. Run the news ingestion script (fetches and processes articles with AI):
 ```bash
 python scripts/ingest.py
 ```
+
+The ingest script will:
+- Fetch latest articles from configured sources
+- Use GPT-3.5 to identify mentioned companies and topics
+- Use GPT-4 to generate concise summaries
+- Save processed articles to data/news.json
 
 3. Access the API documentation:
 - Swagger UI: http://localhost:8000/docs
