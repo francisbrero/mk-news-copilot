@@ -95,4 +95,4 @@ We will build the application iteratively, starting with the core data structure
 
 *   Access to OpenAI API keys with sufficient quota for GPT-3.5 and GPT-4o.
 *   The initial set of news sources are accessible via RSS or simple web scraping.
-*   A single-user context is sufficient for the MVP subscription model. 
+*   A single-user context is sufficient for the MVP subscription model.
