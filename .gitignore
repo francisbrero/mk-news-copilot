@@ -1,0 +1,16 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+# Ignore all files in the news directory
+news/*
+
+# Ignore all files in the companies directory
+companies/*
+
+# ignore venv
+venv/*
+
+# ignore node_modules
+node_modules/*
+
