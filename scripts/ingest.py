@@ -1,84 +1,72 @@
-#!/usr/bin/env python3
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
 
-"""News ingestion script.
-
-This script will be implemented to fetch news from various sources,
-process them through the AI pipeline, and store them in news.json.
-"""
-
-import feedparser
+import json
+from typing import Dict, List
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
-from typing import List, Dict
-import sys
-import os
+from app.ai.ai_processor import tag_article, summarize_article
+from app.data_utils import read_json_file, write_json_file
 
-# Add the project root to Python path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from app.models.news import NewsArticle
-from app.utils.data_utils import load_json_file, save_json_file
-
-def fetch_techcrunch_articles() -> List[NewsArticle]:
-    """Fetch articles from TechCrunch RSS feed."""
-    feed_url = "https://techcrunch.com/feed/"
-    feed = feedparser.parse(feed_url)
-    articles = []
-
-    for entry in feed.entries:
-        try:
-            # Extract article content
-            response = requests.get(entry.link)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Find the main article content (adjust selectors based on actual HTML structure)
-            content_div = soup.select_one('div.article-content')
-            content = content_div.get_text(strip=True) if content_div else entry.summary
-            
-            article = NewsArticle(
-                url=entry.link,
-                title=entry.title,
-                content=content,
-                published_at=datetime(*entry.published_parsed[:6]),
-                source="TechCrunch"
-            )
+def fetch_techcrunch_articles() -> List[Dict]:
+    """
+    Fetches latest articles from TechCrunch RSS feed.
+    """
+    try:
+        response = requests.get("https://techcrunch.com/feed/")
+        soup = BeautifulSoup(response.content, features="xml")
+        articles = []
+        
+        for item in soup.find_all("item")[:5]:  # Limit to 5 articles for MVP
+            article = {
+                "title": item.title.text,
+                "url": item.link.text,
+                "content": item.description.text,
+                "published_at": item.pubDate.text,
+                "source": "TechCrunch",
+                "companies": [],
+                "topics": [],
+                "summary": ""
+            }
             articles.append(article)
-        except Exception as e:
-            print(f"Error processing article {entry.link}: {str(e)}")
-            continue
-    
-    return articles
+            
+        return articles
+    except Exception as e:
+        print(f"Error fetching TechCrunch articles: {str(e)}")
+        return []
 
-def is_duplicate(article: NewsArticle, existing_articles: List[Dict]) -> bool:
-    """Check if an article already exists in our database."""
-    if not existing_articles or not isinstance(existing_articles, dict):
-        return False
-    existing_items = existing_articles.get('items', [])
-    return any(a.get('url') == str(article.url) for a in existing_items)
-
-def main():
+def process_articles():
+    """
+    Main function to fetch, process, and store articles.
+    """
     # Load existing articles
-    existing_articles = load_json_file('news.json')
-    if not isinstance(existing_articles, dict):
-        existing_articles = {'items': []}
+    existing_articles = read_json_file("news.json")
+    existing_urls = {article.get("url") for article in existing_articles}
     
     # Fetch new articles
-    print("Fetching articles from TechCrunch...")
     new_articles = fetch_techcrunch_articles()
+    articles_added = 0
     
-    # Filter out duplicates and add new articles
-    articles_to_add = []
+    # Process each new article
     for article in new_articles:
-        if not is_duplicate(article, existing_articles):
-            articles_to_add.append(article.model_dump())
+        if article["url"] in existing_urls:
+            continue
+            
+        # Enrich with AI processing
+        tags = tag_article(f"{article['title']}\n\n{article['content']}")
+        article["companies"] = tags["companies"]
+        article["topics"] = tags["topics"]
+        article["summary"] = summarize_article(f"{article['title']}\n\n{article['content']}")
+        
+        # Add to existing articles
+        existing_articles.append(article)
+        articles_added += 1
+        print(f"Processed article: {article['title']}")
     
-    if articles_to_add:
-        existing_articles['items'].extend(articles_to_add)
-        save_json_file('news.json', existing_articles)
-        print(f"Added {len(articles_to_add)} new articles")
-    else:
-        print("No new articles found")
+    # Save updated articles
+    write_json_file("news.json", existing_articles)
+    print(f"Saved {articles_added} new articles")
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    process_articles()
