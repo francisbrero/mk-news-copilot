@@ -6,6 +6,7 @@ from threading import Lock
 from datetime import datetime
 from pydantic import BaseModel, HttpUrl
 from fastapi import HTTPException
+import uuid
 
 # File paths
 DATA_DIR = Path("data")
@@ -73,24 +74,60 @@ def ensure_data_files():
             with open(file_path, 'w') as f:
                 json.dump(empty_json, f)
 
+def parse_date(date_str: str) -> datetime:
+    """Parse various date formats into datetime objects."""
+    try:
+        # Try parsing RFC 2822 format (e.g. 'Mon, 07 Apr 2025 14:56:27 +0000')
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(date_str)
+    except:
+        try:
+            # Try ISO format
+            return datetime.fromisoformat(date_str)
+        except:
+            raise ValueError(f"Unable to parse date: {date_str}")
+
 def read_json_file(filename: str) -> List[Dict[str, Any]]:
     filepath = os.path.join(DATA_DIR, filename)
     try:
         if not os.path.exists(filepath):
             return []
         with open(filepath, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+            
+            # If this is news.json, ensure each article has an ID and proper date format
+            if filename == "news.json":
+                for article in data:
+                    if "id" not in article:
+                        article["id"] = str(uuid.uuid4())
+                    if "published_at" in article:
+                        try:
+                            # Convert to ISO format string
+                            article["published_at"] = parse_date(article["published_at"]).isoformat()
+                        except ValueError:
+                            # If date parsing fails, use current time
+                            article["published_at"] = datetime.utcnow().isoformat()
+            
+            return data
     except json.JSONDecodeError:
         return []
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading {filename}: {str(e)}")
+
+def serialize_json(obj: Any) -> Any:
+    """Custom JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, HttpUrl):
+        return str(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 def write_json_file(filename: str, data: List[Dict[str, Any]]) -> None:
     filepath = os.path.join(DATA_DIR, filename)
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2, default=serialize_json)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error writing to {filename}: {str(e)}")
 
@@ -105,6 +142,24 @@ def get_subscriptions() -> List[Dict[str, Any]]:
 
 def save_subscriptions(subscriptions: List[Dict[str, Any]]) -> None:
     write_json_file("subscriptions.json", subscriptions)
+
+def save_companies(companies: List[Dict[str, Any]]) -> None:
+    write_json_file("companies.json", companies)
+
+def add_company(company: Dict[str, Any]) -> Dict[str, Any]:
+    companies = get_companies()
+    
+    # Check if company with same name already exists
+    if any(c["name"].lower() == company["name"].lower() for c in companies):
+        raise HTTPException(status_code=400, detail=f"Company with name '{company['name']}' already exists")
+    
+    # Ensure company has an ID
+    if "id" not in company:
+        company["id"] = str(uuid.uuid4())
+    
+    companies.append(company)
+    save_companies(companies)
+    return company
 
 def append_item(file_path: Path, item: Dict[str, Any]) -> None:
     """Thread-safe append item to JSON file."""

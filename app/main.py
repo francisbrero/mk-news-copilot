@@ -1,8 +1,11 @@
 from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query
-from app.models.schemas import Company, NewsArticle, Subscription, SubscriptionUpdate
-from app.utils.data_utils import get_news, get_companies, get_subscriptions, save_subscriptions
+from app.models.schemas import Company, CompanyCreate, NewsArticle, Subscription, SubscriptionUpdate
+from app.utils.data_utils import (
+    get_news, get_companies, get_subscriptions, save_subscriptions,
+    add_company
+)
 
 app = FastAPI(
     title="MK News Copilot",
@@ -37,6 +40,11 @@ async def list_companies(name: Optional[str] = None):
     if name:
         companies = [c for c in companies if name.lower() in c["name"].lower()]
     return companies
+
+@app.post("/companies", response_model=Company)
+async def create_company(company: CompanyCreate):
+    """Create a new company. Only name is required, website and description are optional."""
+    return add_company(company.model_dump())
 
 @app.get("/subscriptions", response_model=Subscription)
 async def get_user_subscriptions(user_id: str):
