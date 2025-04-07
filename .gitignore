@@ -54,3 +54,15 @@ env/
 # Local data
 data/*.json
 !data/.gitkeep
+
+# ignore all pycache
+*/__pycache__/
+*/*/__pycache__/
+*/__pycache__
+*/*/__pycache__
+
+# Ignore data directory
+data/
+
+# Ignore .specstory directory
+.specstory/

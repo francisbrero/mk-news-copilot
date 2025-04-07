@@ -77,6 +77,9 @@ mk-news-copilot/
 uvicorn app.main:app --reload
 ```
 
+[Swagger UI](http://localhost:8000/docs)
+[ReDoc](http://localhost:8000/redoc)
+
 2. Run the news ingestion script (fetches and processes articles with AI):
 ```bash
 python scripts/ingest.py
