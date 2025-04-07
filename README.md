@@ -94,12 +94,80 @@ The ingest script will:
 
 ## API Endpoints
 
-- `GET /news` - Get news articles with filtering options
-- `GET /companies` - List all companies
-- `POST /subscriptions` - Add a subscription
-- `GET /subscriptions` - List user subscriptions
-- `DELETE /subscriptions` - Remove a subscription
-- `GET /feed` - Get personalized news feed
+### News
+
+- `GET /news`
+  - Get news articles with filtering options
+  - Query parameters:
+    - `company`: Filter by company ID
+    - `topic`: Filter by topic
+    - `start_date`: Filter by date (ISO format)
+    - `end_date`: Filter by date (ISO format)
+
+### Companies
+
+- `GET /companies`
+  - List all companies
+  - Query parameters:
+    - `name`: Filter companies by name (case-insensitive)
+
+### Subscriptions
+
+- `GET /subscriptions`
+  - Get user's subscriptions
+  - Query parameters:
+    - `user_id`: User identifier
+
+- `POST /subscriptions`
+  - Add or remove a subscription
+  - Query parameters:
+    - `user_id`: User identifier
+  - Request body:
+    ```json
+    {
+      "company_id": "string",  // optional
+      "topic": "string",       // optional
+      "action": "add"         // "add" or "remove"
+    }
+    ```
+
+- `DELETE /subscriptions`
+  - Clear all subscriptions for a user
+  - Query parameters:
+    - `user_id`: User identifier
+
+### Feed
+
+- `GET /feed`
+  - Get personalized news feed based on subscriptions
+  - Query parameters:
+    - `user_id`: User identifier
+    - `start_date`: Filter by date (ISO format, optional)
+    - `end_date`: Filter by date (ISO format, optional)
+
+## Example Usage
+
+```bash
+# Get all news articles
+curl http://localhost:8000/news
+
+# Get news for a specific company
+curl http://localhost:8000/news?company=company_id
+
+# Get news for a specific topic
+curl http://localhost:8000/news?topic=Fundraising
+
+# Get news within a date range
+curl "http://localhost:8000/news?start_date=2024-01-01T00:00:00&end_date=2024-12-31T23:59:59"
+
+# Subscribe to a company
+curl -X POST "http://localhost:8000/subscriptions?user_id=user1" \
+  -H "Content-Type: application/json" \
+  -d '{"company_id": "company_id", "action": "add"}'
+
+# Get personalized feed
+curl "http://localhost:8000/feed?user_id=user1"
+```
 
 ## Development
 

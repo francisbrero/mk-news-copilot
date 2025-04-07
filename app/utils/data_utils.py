@@ -5,6 +5,7 @@ from pathlib import Path
 from threading import Lock
 from datetime import datetime
 from pydantic import BaseModel, HttpUrl
+from fastapi import HTTPException
 
 # File paths
 DATA_DIR = Path("data")
@@ -72,26 +73,38 @@ def ensure_data_files():
             with open(file_path, 'w') as f:
                 json.dump(empty_json, f)
 
-def read_json_file(file_path: Path) -> Dict[str, List[Any]]:
-    """Thread-safe read from JSON file."""
-    with file_locks[file_path]:
-        if not file_path.exists():
-            return {"items": []}
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-            if not isinstance(data, dict) or 'items' not in data:
-                return {"items": []}
-            return data
+def read_json_file(filename: str) -> List[Dict[str, Any]]:
+    filepath = os.path.join(DATA_DIR, filename)
+    try:
+        if not os.path.exists(filepath):
+            return []
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        return []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading {filename}: {str(e)}")
 
-def write_json_file(file_path: Path, data: Dict[str, List[Any]]) -> None:
-    """Thread-safe write to JSON file."""
-    if not isinstance(data, dict) or 'items' not in data:
-        data = {"items": []}
-        
-    with file_locks[file_path]:
-        with open(file_path, 'w') as f:
-            json.dump(data, f, indent=2, default=json_serialize)
+def write_json_file(filename: str, data: List[Dict[str, Any]]) -> None:
+    filepath = os.path.join(DATA_DIR, filename)
+    try:
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error writing to {filename}: {str(e)}")
 
+def get_news() -> List[Dict[str, Any]]:
+    return read_json_file("news.json")
+
+def get_companies() -> List[Dict[str, Any]]:
+    return read_json_file("companies.json")
+
+def get_subscriptions() -> List[Dict[str, Any]]:
+    return read_json_file("subscriptions.json")
+
+def save_subscriptions(subscriptions: List[Dict[str, Any]]) -> None:
+    write_json_file("subscriptions.json", subscriptions)
 
 def append_item(file_path: Path, item: Dict[str, Any]) -> None:
     """Thread-safe append item to JSON file."""
