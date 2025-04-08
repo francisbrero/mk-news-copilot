@@ -27,11 +27,6 @@ class Subscription(BaseModel):
     companies: List[str] = []
     topics: List[str] = []
 
-class SubscriptionUpdate(BaseModel):
-    company_id: Optional[str] = None
-    topic: Optional[str] = None
-    action: Literal["add", "remove"]
-
 class UserBase(BaseModel):
     email: EmailStr
     name: str
@@ -48,3 +43,8 @@ class User(UserBase):
     id: str
     created_at: datetime
     updated_at: datetime
+
+class SubscriptionUpdate(BaseModel):
+    company_id: Optional[str] = None
+    topic: Optional[str] = None
+    action: Literal["add", "remove"]
