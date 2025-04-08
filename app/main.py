@@ -1,7 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
-from app.models import Company, CompanyCreate, NewsArticle, Subscription, SubscriptionUpdate, User, UserCreate, UserUpdate
+from app.models import (
+    Company, CompanyCreate, NewsArticle, 
+    Subscription, SubscriptionCreate, SubscriptionUpdate, 
+    User, UserCreate, UserUpdate
+)
 from app.utils.data_utils import (
     get_news, get_companies, get_subscriptions, save_subscriptions,
     add_company, get_user_by_id, get_user_by_email, create_user,
@@ -9,6 +13,7 @@ from app.utils.data_utils import (
 )
 import subprocess
 import sys
+import uuid
 
 app = FastAPI(
     title="MK News Copilot",
@@ -49,48 +54,42 @@ async def create_company(company: CompanyCreate):
     """Create a new company. Only name is required, website and description are optional."""
     return add_company(company.model_dump())
 
-@app.get("/subscriptions", response_model=Subscription)
+@app.get("/subscriptions/{user_id}", response_model=List[Subscription])
 async def get_user_subscriptions(user_id: str):
     subscriptions = get_subscriptions()
-    user_sub = next((s for s in subscriptions if s["user_id"] == user_id), None)
-    if not user_sub:
-        return {"user_id": user_id, "company_ids": [], "topics": []}
-    return user_sub
+    user_subs = [s for s in subscriptions if s["user_id"] == user_id]
+    return user_subs
 
 @app.post("/subscriptions", response_model=Subscription)
-async def update_subscription(user_id: str, update: SubscriptionUpdate):
+async def add_subscription(subscription: SubscriptionCreate):
     subscriptions = get_subscriptions()
-    user_sub = next((s for s in subscriptions if s["user_id"] == user_id), None)
-    
-    if not user_sub:
-        user_sub = {"user_id": user_id, "company_ids": [], "topics": []}
-        subscriptions.append(user_sub)
-    
-    if update.company_id:
-        if update.action == "add" and update.company_id not in user_sub["company_ids"]:
-            user_sub["company_ids"].append(update.company_id)
-        elif update.action == "remove" and update.company_id in user_sub["company_ids"]:
-            user_sub["company_ids"].remove(update.company_id)
-    
-    if update.topic:
-        if update.action == "add" and update.topic not in user_sub["topics"]:
-            user_sub["topics"].append(update.topic)
-        elif update.action == "remove" and update.topic in user_sub["topics"]:
-            user_sub["topics"].remove(update.topic)
-    
+    now = datetime.now(timezone.utc).isoformat()
+    new_sub = {
+        "id": str(uuid.uuid4()),
+        **subscription.model_dump(),
+        "created_at": now,
+        "updated_at": now
+    }
+    subscriptions.append(new_sub)
     save_subscriptions(subscriptions)
-    return user_sub
+    return new_sub
 
-@app.delete("/subscriptions", response_model=Subscription)
-async def clear_subscriptions(user_id: str):
+@app.delete("/subscriptions/{subscription_id}", response_model=dict)
+async def remove_subscription(subscription_id: str):
     subscriptions = get_subscriptions()
-    user_sub_idx = next((i for i, s in enumerate(subscriptions) if s["user_id"] == user_id), None)
-    
-    if user_sub_idx is not None:
-        subscriptions.pop(user_sub_idx)
-        save_subscriptions(subscriptions)
-    
-    return {"user_id": user_id, "company_ids": [], "topics": []}
+    sub_idx = next((i for i, s in enumerate(subscriptions) if s["id"] == subscription_id), None)
+    if sub_idx is None:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    subscriptions.pop(sub_idx)
+    save_subscriptions(subscriptions)
+    return {"status": "success"}
+
+@app.delete("/subscriptions", response_model=dict)
+async def delete_subscriptions(user_id: str):
+    subscriptions = get_subscriptions()
+    subscriptions = [s for s in subscriptions if s["user_id"] != user_id]
+    save_subscriptions(subscriptions)
+    return {"status": "success"}
 
 @app.get("/feed", response_model=List[NewsArticle])
 async def get_user_feed(
@@ -98,14 +97,15 @@ async def get_user_feed(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None
 ):
-    user_sub = await get_user_subscriptions(user_id)
+    user_subs = await get_user_subscriptions(user_id)
     news = get_news()
     
     filtered_news = []
     for article in news:
         # Check if article matches any company or topic subscription
-        if (any(c in article.get("companies", []) for c in user_sub["company_ids"]) or
-            any(t in article.get("topics", []) for t in user_sub["topics"])):
+        if any(sub for sub in user_subs if 
+               (any(c in article.get("companies", []) for c in sub["company_ids"]) or
+                any(t in article.get("topics", []) for t in sub["topics"]))):
             
             # Apply date filters if provided
             article_date = datetime.fromisoformat(article["published_at"])

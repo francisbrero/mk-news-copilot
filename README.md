@@ -181,8 +181,45 @@ pip install -r requirements-dev.txt
 
 2. Run tests:
 ```bash
+# Run all tests
 pytest
+
+# Run tests with coverage report
+pytest --cov=app tests/
+
+# Run specific test file
+pytest tests/test_api.py
+
+# Run tests with verbose output
+pytest -v
 ```
+
+3. Code formatting and linting:
+```bash
+# Format code with black
+black app/ tests/
+
+# Sort imports
+isort app/ tests/
+
+# Run flake8 linting
+flake8 app/ tests/
+```
+
+4. Test Structure:
+```
+tests/
+├── test_api.py           # API endpoint tests
+├── test_ai_processor.py  # AI processing tests
+└── test_data_utils.py    # Data utility tests
+```
+
+The test suite includes:
+- API endpoint tests with request/response validation
+- AI processor tests with mocked OpenAI calls
+- Data utility tests for file operations
+- Error handling and edge cases
+- Mock data fixtures for consistent testing
 
 ## License
 

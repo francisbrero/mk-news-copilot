@@ -1,3 +1,4 @@
+import json
 from typing import Dict, List
 import os
 from openai import OpenAI
@@ -23,6 +24,9 @@ def tag_article(article_text: str) -> Dict:
     """
     Uses GPT-3.5 to identify companies and topics in an article.
     """
+    if not article_text or not isinstance(article_text, str):
+        return {"companies": [], "topics": []}
+        
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -42,9 +46,11 @@ def tag_article(article_text: str) -> Dict:
             temperature=0.3
         )
         
-        result = response.choices[0].message.content
-        # Note: In production, we'd want to add proper JSON parsing and validation here
-        return eval(result)  # This is a simplified approach for the MVP
+        result = json.loads(response.choices[0].message.content)
+        return {
+            "companies": result.get("companies", []),
+            "topics": result.get("topics", [])
+        }
     except Exception as e:
         print(f"Error in tag_article: {str(e)}")
         return {"companies": [], "topics": []}
@@ -53,6 +59,9 @@ def summarize_article(article_text: str) -> str:
     """
     Uses GPT-4 to generate a 1-2 sentence summary of an article.
     """
+    if not article_text or not isinstance(article_text, str):
+        return "The article cannot be summarized as the content provided is not sufficient or relevant."
+        
     try:
         response = client.chat.completions.create(
             model="gpt-4",
