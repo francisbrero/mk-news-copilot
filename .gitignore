@@ -72,3 +72,6 @@ data/
 
 # Ignore test data
 tests/test_data/
+
+# Ignore .benchmarks directory
+.benchmarks/
