@@ -68,11 +68,17 @@ We will build the application iteratively, starting with the core data structure
 
 *   **Tasks:**
     *   Add `pytest` to `requirements.txt`.
+    *   Create `data/users.json` for storing user data with Pydantic model for `User`.
+    *   Implement new API endpoints:
+        *   `POST /news/refresh`: Trigger news ingestion by running `scripts/ingest.py`.
+        *   `POST /users`: Create a new user.
+        *   `GET /users/{user_id}`: Retrieve user details.
+        *   `PUT /users/{user_id}`: Update user information.
+        *   `DELETE /users/{user_id}`: Delete a user and their subscriptions.
     *   Write unit tests for `data_utils.py`, `ai_processor.py` (mocking OpenAI calls), and core API endpoint logic using FastAPI's `TestClient`.
-    *   Perform manual end-to-end testing: run ingestion, then query API endpoints using `curl` or a tool like Postman/Insomnia.
     *   Write/update `README.md`: Include setup instructions, how to run ingestion, how to start the API server, and basic API usage examples.
     *   Ensure FastAPI's automatic Swagger UI (`/docs`) and ReDoc (`/redoc`) documentation is generated and accessible.
-*   **Outcome:** Increased confidence in code correctness, clear instructions for running and using the application.
+*   **Outcome:** Increased confidence in code correctness, clear instructions for running and using the application, and complete user management functionality.
 
 ### Milestone 6: Refinement & Future Considerations (Ongoing)
 
