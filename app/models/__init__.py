@@ -3,6 +3,7 @@ from app.models.schemas import (
     CompanyCreate,
     NewsArticle,
     Subscription,
+    SubscriptionCreate,
     SubscriptionUpdate,
     User,
     UserCreate,

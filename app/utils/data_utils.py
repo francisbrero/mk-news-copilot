@@ -10,10 +10,21 @@ import uuid
 from passlib.hash import bcrypt
 
 # File paths
-DATA_DIR = Path("data")
-NEWS_FILE = DATA_DIR / "news.json"
-COMPANIES_FILE = DATA_DIR / "companies.json"
-SUBSCRIPTIONS_FILE = DATA_DIR / "subscriptions.json"
+DATA_DIR = Path("data")  # Default to data directory
+NEWS_FILE = None  # Will be set when DATA_DIR is set
+COMPANIES_FILE = None  # Will be set when DATA_DIR is set
+SUBSCRIPTIONS_FILE = None  # Will be set when DATA_DIR is set
+
+def set_data_dir(dir_path: Union[str, Path]) -> None:
+    """Set the data directory and update file paths."""
+    global DATA_DIR, NEWS_FILE, COMPANIES_FILE, SUBSCRIPTIONS_FILE
+    DATA_DIR = Path(dir_path)
+    NEWS_FILE = DATA_DIR / "news.json"
+    COMPANIES_FILE = DATA_DIR / "companies.json"
+    SUBSCRIPTIONS_FILE = DATA_DIR / "subscriptions.json"
+
+# Initialize default paths
+set_data_dir(DATA_DIR)
 
 # Thread-safe file operations
 file_locks = {
@@ -44,8 +55,18 @@ def save_json_file(filename: str, data: Dict[str, List[Dict[Any, Any]]]) -> None
     """Save data to a JSON file atomically."""
     if not isinstance(data, dict) or 'items' not in data:
         data = {"items": []}
+    else:
+        # Create a deep copy to avoid modifying the input data
+        data = {"items": data["items"]}
     
-    filepath = ensure_data_dir() / filename
+    # If filename is just a name, use DATA_DIR, otherwise use it as is
+    if "/" not in filename and "\\" not in filename:
+        filepath = DATA_DIR / filename
+    else:
+        filepath = Path(filename)
+    
+    # Ensure parent directory exists
+    filepath.parent.mkdir(parents=True, exist_ok=True)
     temp_filepath = filepath.with_suffix('.tmp')
     
     # First write to a temporary file
@@ -89,12 +110,21 @@ def parse_date(date_str: str) -> datetime:
             raise ValueError(f"Unable to parse date: {date_str}")
 
 def read_json_file(filename: str) -> List[Dict[str, Any]]:
-    filepath = os.path.join(DATA_DIR, filename)
+    # If filename is just a name, use DATA_DIR, otherwise use it as is
+    if "/" not in filename and "\\" not in filename:
+        filepath = DATA_DIR / filename
+    else:
+        filepath = Path(filename)
+    
     try:
-        if not os.path.exists(filepath):
+        if not filepath.exists():
             return []
         with open(filepath, 'r') as f:
             data = json.load(f)
+            
+            # Handle both wrapped and unwrapped data formats
+            if isinstance(data, dict) and 'items' in data:
+                data = data['items']
             
             # If this is news.json, ensure each article has an ID and proper date format
             if filename == "news.json":

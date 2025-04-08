@@ -66,3 +66,9 @@ data/
 
 # Ignore .specstory directory
 .specstory/
+
+# Ignore .pytest_cache directory
+.pytest_cache/
+
+# Ignore test data
+tests/test_data/
