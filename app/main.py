@@ -1,11 +1,14 @@
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Query
-from app.models.schemas import Company, CompanyCreate, NewsArticle, Subscription, SubscriptionUpdate
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from app.models import Company, CompanyCreate, NewsArticle, Subscription, SubscriptionUpdate, User, UserCreate, UserUpdate
 from app.utils.data_utils import (
     get_news, get_companies, get_subscriptions, save_subscriptions,
-    add_company
+    add_company, get_user_by_id, get_user_by_email, create_user,
+    update_user, delete_user
 )
+import subprocess
+import sys
 
 app = FastAPI(
     title="MK News Copilot",
@@ -114,3 +117,43 @@ async def get_user_feed(
             filtered_news.append(article)
     
     return filtered_news
+
+@app.post("/news/refresh", status_code=202)
+async def refresh_news(background_tasks: BackgroundTasks):
+    """Trigger news ingestion in the background"""
+    def run_ingest():
+        subprocess.run([sys.executable, "scripts/ingest.py"], check=True)
+    
+    background_tasks.add_task(run_ingest)
+    return {"message": "News refresh started"}
+
+@app.post("/users", response_model=User)
+async def create_new_user(user: UserCreate):
+    """Create a new user"""
+    try:
+        return create_user(user.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/users/{user_id}", response_model=User)
+async def get_user(user_id: str):
+    """Get user details"""
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@app.put("/users/{user_id}", response_model=User)
+async def update_user_details(user_id: str, user_update: UserUpdate):
+    """Update user details"""
+    updated_user = update_user(user_id, user_update.model_dump(exclude_unset=True))
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated_user
+
+@app.delete("/users/{user_id}", status_code=204)
+async def delete_user_account(user_id: str):
+    """Delete a user and their subscriptions"""
+    if not delete_user(user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    return None

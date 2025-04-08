@@ -1,12 +1,13 @@
 import json
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from pathlib import Path
 from threading import Lock
 from datetime import datetime
 from pydantic import BaseModel, HttpUrl
 from fastapi import HTTPException
 import uuid
+from passlib.hash import bcrypt
 
 # File paths
 DATA_DIR = Path("data")
@@ -167,6 +168,94 @@ def append_item(file_path: Path, item: Dict[str, Any]) -> None:
         data = read_json_file(file_path)
         data["items"].append(item)
         write_json_file(file_path, data)
+
+def get_users() -> List[Dict]:
+    """Get all users from users.json"""
+    return read_json_file('users.json')
+
+def get_user_by_id(user_id: str) -> Union[Dict, None]:
+    """Get a user by ID"""
+    users = get_users()
+    return next((u for u in users if u['id'] == user_id), None)
+
+def get_user_by_email(email: str) -> Union[Dict, None]:
+    """Get a user by email"""
+    users = get_users()
+    return next((u for u in users if u['email'] == email), None)
+
+def create_user(user_data: Dict) -> Dict:
+    """Create a new user"""
+    users = get_users()
+    
+    # Check if email already exists
+    if get_user_by_email(user_data['email']):
+        raise ValueError('Email already exists')
+    
+    # Hash password
+    user_data['password'] = bcrypt.hash(user_data['password'])
+    
+    # Add metadata
+    now = datetime.utcnow().isoformat()
+    user = {
+        **user_data,
+        'id': str(uuid.uuid4()),
+        'created_at': now,
+        'updated_at': now
+    }
+    
+    users.append(user)
+    write_json_file('users.json', users)
+    
+    # Return user without password
+    user_response = user.copy()
+    del user_response['password']
+    return user_response
+
+def update_user(user_id: str, user_data: Dict) -> Union[Dict, None]:
+    """Update a user"""
+    users = get_users()
+    user_idx = next((i for i, u in enumerate(users) if u['id'] == user_id), None)
+    
+    if user_idx is None:
+        return None
+        
+    # Update user data
+    user = users[user_idx]
+    if 'password' in user_data:
+        user_data['password'] = bcrypt.hash(user_data['password'])
+    
+    user = {
+        **user,
+        **user_data,
+        'updated_at': datetime.utcnow().isoformat()
+    }
+    users[user_idx] = user
+    
+    write_json_file('users.json', users)
+    
+    # Return user without password
+    user_response = user.copy()
+    del user_response['password']
+    return user_response
+
+def delete_user(user_id: str) -> bool:
+    """Delete a user and their subscriptions"""
+    users = get_users()
+    user_idx = next((i for i, u in enumerate(users) if u['id'] == user_id), None)
+    
+    if user_idx is None:
+        return False
+        
+    # Delete user
+    users.pop(user_idx)
+    write_json_file('users.json', users)
+    
+    # Delete user's subscriptions
+    subscriptions = read_json_file('subscriptions.json')
+    subscriptions = [s for s in subscriptions if s['user_id'] != user_id]
+    write_json_file('subscriptions.json', subscriptions)
+    
+    return True
 
 # Initialize data files
 ensure_data_files() 
